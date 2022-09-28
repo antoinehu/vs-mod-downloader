@@ -1,9 +1,12 @@
 import requests
 import re
-import string
 import os, sys
-import wget_ as wget
 from bs4 import BeautifulSoup as bs
+from pathlib import Path
+try:
+    import wget
+except ImportError:
+    import wget_ as wget
 
 home_url = "https://mods.vintagestory.at"
 modlist_url = "https://mods.vintagestory.at/list/mod"
@@ -12,32 +15,23 @@ req_modname=requests.get(modlist_url,'html.parser')
 search_active = False
 curr_path=os.path.dirname(os.path.abspath(__file__))
 
-if not os.path.isfile(".\\modsdir.txt"):
-    f=open(".\\modsdir.txt", "w+")    
-    mods_dir=input('What is your mod directory?')
-    f.write(mods_dir)
-    f.close
+config_file = Path("modsdir.txt")
 
-f=open(".\\modsdir.txt", "r")
+try:
+    with open(config_file, "r") as f:
+        mods_dir = f.read()
+except FileNotFoundError:
+    mods_dir = input('What is your mod directory?')
+    print(f"Writing {mods_dir} to " + str(config_file.absolute()))
+    with open(config_file, "w") as f:
+        f.write(mods_dir)
 
-if f.read()=='':
-    f.close()
-    f=open(".\\modsdir.txt", "w")
-    mods_dir=input('What is your mod directory?')
-    f.write(mods_dir)
-    f.close()
+modpath = Path(mods_dir)
 
-f.close()
-    
-f=open(".\\modsdir.txt", "r")
-modpath=f.read()
-f.close()
-
-path_out='.\\output'
-if not os.path.isdir(path_out):
-    os.mkdir(path_out)
-    print("Creating output directory")
-
+path_out = Path("output")
+if not path_out.is_dir():
+    print("Creating output directory at " + str(path_out.absolute()))
+    path_out.mkdir()
 
 modlist = os.listdir(modpath)
 mods=[]
@@ -90,7 +84,7 @@ for m,full_mod in mods:
     
     html_modname=req_modname.text
     html_modname=html_modname.strip(" _-.'!")
-    p_htmlmodname=bs(html_modname)
+    p_htmlmodname=bs(html_modname, features="lxml")
     #print(p_htmlmodname)
 
     mod_urls=p_htmlmodname.find_all('strong',text=re.compile(".*({}).*".format(regex),re.IGNORECASE))
@@ -123,7 +117,7 @@ for m,full_mod in mods:
         req_filelist = requests.get(url, 'html.parser')
         html_filelist=req_filelist.text
         
-        p_htmlfilelist= bs(html_filelist)
+        p_htmlfilelist= bs(html_filelist, features="lxml")
         trs = p_htmlfilelist.body.find_all('tr', attrs={"data-assetid":True})
         latest = max(trs, key = lambda tr: int(tr.attrs["data-assetid"]))
         fileid = latest.find('a', {'href':re.compile(r'/download\?fileid.')})['href']
@@ -133,7 +127,7 @@ for m,full_mod in mods:
         print('\n\n'+full_mod)
         print(url)
         print(downlink)
-        response=wget.download(downlink, out=path_out)
+        response=wget.download(downlink, out=str(path_out))
     else:
         break_=False
 
